@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer 
 
 from .models import Test, Question, Answer, Submission, SelectedAnswer
 
@@ -48,6 +49,30 @@ class QuestionSerializer(serializers.ModelSerializer):
             if count > 1:
                 raise serializers.ValidationError("Only one answer can be correct.")
             return count == 1
+        
+    def update(self, instance, validate_data):
+        instance.title = validate_data['title', instance.title]
+        instance.save()
+
+        answers_data = validate_data.pop('answers')
+        new_answers_ids = []
+        for answer_data in answers_data:
+            try:
+                answer = Answer.objects.get(pk=answers_data.id)
+                answer.title = answer_data['title']
+                answer.is_correct = answer_data['is_correct']
+                new_answers_ids.append(id)
+            except Answer.DoesNotExist:
+                new_answer =Answer.objects.create(
+                    title=answer_data["title"],
+                    is_correct=answer_data["is_correct"],
+                    question=instance
+                )
+                new_answers_ids.append(new_answer.id)
+
+        instance.answers.exclude(id__in=new_answers_ids).delete()        
+        
+
 
 
 class TestSerializer(serializers.ModelSerializer):
@@ -86,3 +111,33 @@ class SubmissionSerializer(serializers.ModelSerializer):
             )
 
         return submission
+    
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        data["accessToken"] = data.pop("access")
+        data["refreshToken"] = data.pop("refresh")
+
+        data["user"] = {
+            'user_id':self.user.username,
+            'user_username':self.user.username,
+            'avatar_url':""
+        }
+
+
+        return data
+
+
+class MyTestSerializers(serializers.ModelSerializer):
+    savollar_soni = serializers.SerializerMethodField()
+    submissionlar_soni = serializers.SerializerMethodField()
+    class Meta:
+        model = Test
+        fields = ['id', 'nomi', 'created_at', 'savollar_soni','submissionlar_soni']
+    
+    def get_savollar_soni(self, attrs):
+        return attrs.questions.count()
+    
+    def get_submissionlar_soni(self, attrs):
+        return attrs.submissions.count() 
