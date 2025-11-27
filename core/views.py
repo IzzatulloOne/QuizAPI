@@ -9,25 +9,26 @@ from rest_framework.viewsets import ModelViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import NotFound
 
-
 from .models import Test, Question, Answer, Submission, SelectedAnswer
 from .serializers import (
     TestSerializer,
     QuestionSerializer,
-    AnswerSerializer,
+    MySubmissionsList,
     SubmissionSerializer,
     CustomTokenObtainPairSerializer,
     MyTestSerializers,
+    SelectedAnswerSerializer,
 )
 
 
-class TestModelViewSet(ModelViewSet):
+
+class TestModelDestroyView(generics.DestroyAPIView, generics.UpdateAPIView):
     permission_classes = [IsAuthenticated]
     queryset = Test.objects.all()
     serializer_class = TestSerializer
 
-    def perform_create(self, serializer):
-        serializer.save(creator=self.request.user)
+
+
 
 
 class QuestionListCreateAPI(APIView):
@@ -62,6 +63,7 @@ class SubmissionAPIView(generics.CreateAPIView):
         return Response(serializer.data, status=201)
     
 
+
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
 
@@ -73,6 +75,7 @@ class MyTestListView(generics.ListAPIView):
 
     def get_queryset(self):
         return Test.objects.filter(creator=self.request.user)
+
 
 
 class TestQuetionsListView(generics.ListCreateAPIView):
@@ -94,6 +97,46 @@ class TestQuetionsListView(generics.ListCreateAPIView):
         serializer.save(test=test)
 
 
+
 class TestQuestionDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = QuestionSerializer
     queryset = Question.objects.all()
+
+
+
+class MySubmissionsListView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+
+    serializer_class = MySubmissionsList
+    queryset = Submission.objects.all()
+
+    def get_queryset(self):
+        return Submission.objects.filter(user=self.request.user)
+
+
+
+class SelectedAnswerViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated]
+    queryset = SelectedAnswer.objects.all()
+    serializer_class = SelectedAnswerSerializer
+
+    def get_queryset(self):
+        return SelectedAnswer.objects.filter(submission__user=self.request.user)
+    
+    def perform_create(self, serializer):
+        submission_id = self.request.data.get('submission_id')
+        try:
+            submission = Submission.objects.get(id=submission_id, user=self.request.user)
+        except Submission.DoesNotExist:
+            raise NotFound(detail="Submission not found")
+        
+        serializer.save(submission=submission)
+
+
+class SubmissionDetailView(generics.RetrieveAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = SubmissionSerializer
+    queryset = Submission.objects.all()
+
+    def get_queryset(self):
+        return Submission.objects.filter(user=self.request.user)
